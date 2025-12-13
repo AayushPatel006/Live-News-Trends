@@ -12,14 +12,11 @@ import matplotlib.pyplot as plt
 import sys
 import os
 
-# Add the current directory to path to import core_algorithm
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Import the function that fetches trending words from background process
 from core_algorithm import get_top_k_words
 import json
 
-# Set up page config
 st.set_page_config(
     page_title="Live News Feed with Word Analysis",
     layout="wide",
@@ -28,14 +25,11 @@ st.set_page_config(
 
 st.title("📰 Live News Feed with Word Probability Analysis")
 
-# Start background algorithm process on app load
 @st.cache_resource
 def start_background_algorithm():
-    """Start the core algorithm in a background thread"""
     import subprocess
     import sys
     
-    # Start core_algorithm.py as a subprocess
     process = subprocess.Popen(
         [sys.executable, "core_algorithm.py"],
         cwd=os.path.dirname(os.path.abspath(__file__)),
@@ -47,9 +41,8 @@ def start_background_algorithm():
 try:
     bg_process = start_background_algorithm()
 except:
-    pass  # Process might already be running
+    pass
 
-# Initialize session state for auto-refresh
 if 'last_auto_fetch' not in st.session_state:
     st.session_state.last_auto_fetch = 0
 
@@ -66,10 +59,9 @@ if 'server_live' not in st.session_state:
     st.session_state.server_live = False
 
 API_URL = "https://dsa-project-news-api.onrender.com/live"
-FETCH_INTERVAL = 3.5  # seconds
+FETCH_INTERVAL = 3.5
 
 def fetch_news():
-    """Fetch latest news from the API"""
     try:
         response = requests.get(API_URL, timeout=5)
         if response.status_code == 200:
@@ -82,18 +74,12 @@ def fetch_news():
         return None
 
 def calculate_word_probabilities(news_articles):
-    """
-    Get word probabilities from the background core_algorithm process
-    by reading from the JSON file it writes to
-    """
     try:
-        # Try to read trending words from file
         trending_file = os.path.join(os.path.dirname(__file__), "trending_words.json")
         if os.path.exists(trending_file):
             with open(trending_file, "r") as f:
                 trending_dict = json.load(f)
             
-            # Convert to probabilities
             if trending_dict:
                 total = sum(trending_dict.values())
                 return {word: count / total for word, count in trending_dict.items()} if total > 0 else {}
@@ -103,7 +89,6 @@ def calculate_word_probabilities(news_articles):
         return {}
 
 def create_word_probability_chart(word_probs):
-    """Create a bar chart for word probabilities"""
     if not word_probs:
         st.warning("No word probability data available")
         return
@@ -132,11 +117,9 @@ def create_word_probability_chart(word_probs):
     return fig
 
 def create_wordcloud(word_probs):
-    """Create a word cloud from word probabilities"""
     if not word_probs:
         return None
     
-    # Generate word cloud
     wc = WordCloud(
         width=1200,
         height=600,
@@ -146,7 +129,6 @@ def create_wordcloud(word_probs):
         min_font_size=10
     ).generate_from_frequencies(word_probs)
     
-    # Create matplotlib figure
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.imshow(wc, interpolation='bilinear')
     ax.axis('off')
@@ -154,16 +136,13 @@ def create_wordcloud(word_probs):
     
     return fig
 
-# Sidebar controls
 st.sidebar.header("⚙️ Controls")
 
 manual_fetch = st.sidebar.button("🔄 Fetch Now", key="manual_fetch")
 
-# Auto-fetch news every 3.5 seconds using simple polling
 current_time = time.time()
 time_since_last_fetch = current_time - st.session_state.last_auto_fetch
 
-# Fetch if manual button clicked or 3.5 seconds have passed
 if manual_fetch or time_since_last_fetch >= FETCH_INTERVAL:
     news_data = fetch_news()
     st.session_state.last_auto_fetch = current_time
@@ -173,37 +152,32 @@ if manual_fetch or time_since_last_fetch >= FETCH_INTERVAL:
         st.session_state.last_fetch_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         st.session_state.server_live = True
         
-        # Calculate word probabilities from fetched news
         st.session_state.word_probabilities = calculate_word_probabilities(st.session_state.news_data)
     else:
         st.session_state.server_live = False
     
-    # Schedule next rerun after 3.5 seconds
     import streamlit.runtime.app_session as app_session_module
     ctx = st.runtime.scriptrunner.get_script_run_ctx()
     if ctx:
         ctx.session_state._rerun_after_delay = True
 
-# Display server status in sidebar
 st.sidebar.divider()
 if st.session_state.server_live:
     st.sidebar.success("🟢 Server is live")
     if st.session_state.last_fetch_time:
         st.sidebar.caption(f"Last updated: {st.session_state.last_fetch_time}")
 else:
-    if st.session_state.last_fetch_time:  # Only show error if we've tried to fetch
+    if st.session_state.last_fetch_time:
         st.sidebar.error("🔴 Server not live")
 
-# Display latest news on top
 st.subheader("Latest News")
 
 if st.session_state.news_data:
-    for i, article in enumerate(st.session_state.news_data[:5], 1):  # Show top 5
+    for i, article in enumerate(st.session_state.news_data[:5], 1):
         with st.container(border=True):
             st.markdown(f"<h2 style='font-size: 24px;'>{article.get('title', 'No title')}</h2>", unsafe_allow_html=True)
-            st.write(article.get('text', 'N/A')[:400] + "...")  # Show first 300 chars
+            st.write(article.get('text', 'N/A')[:400] + "...")
             
-            # Display categories
             categories = article.get('categories', [])
             if categories:
                 category_tags = " | ".join([f"🏷️ {cat}" for cat in categories])
@@ -212,7 +186,6 @@ if st.session_state.news_data:
             if article.get('url'):
                 st.write(f"[🔗 Read Full Article]({article.get('url')})")
             
-            # Display author
             if article.get('author'):
                 st.caption(f"✍️ Author: {article.get('author')}")
 else:
@@ -220,14 +193,11 @@ else:
 
 st.markdown("---")
 
-# Single tab for word analysis
 st.subheader("🗞️ Analysis")
 
 if st.session_state.word_probabilities:
-    # Display top words prominently
     top_words = list(st.session_state.word_probabilities.items())[:10]
     
-    # Create columns for word display - 10 columns for horizontal layout
     cols = st.columns(10)
     for idx, (word, prob) in enumerate(top_words):
         with cols[idx]:
@@ -240,7 +210,6 @@ if st.session_state.word_probabilities:
     
     st.markdown("---")
 
-    # Create two columns for visualizations
     col1, col2 = st.columns(2)
     
     with col1:
@@ -251,17 +220,10 @@ if st.session_state.word_probabilities:
     
     with col2:
         st.write("### Top Words by Probability")
-        # Bar chart of top words
         fig = create_word_probability_chart(st.session_state.word_probabilities)
         st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("👈 Click 'Fetch Now' to get started with word analysis!")
 
-# st.markdown("---")
-# st.caption("💡 Tip: News is automatically fetched every 3.5 seconds. Use the 'Fetch Now' button for manual refresh. Integrate your algorithm in the `calculate_word_probabilities()` function.")
-
-# Note: Auto-rerun disabled to prevent duplicate visualizations
-# The background algorithm continuously updates trending_words.json
-# Uncomment below to enable auto-refresh every 3.5 seconds
 time.sleep(3.5)
 st.rerun()
